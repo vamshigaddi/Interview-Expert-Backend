@@ -39,6 +39,20 @@ class SessionStore:
         """Delete a session."""
         self._sessions.pop(session_id, None)
 
+    def update_session_usage(self, session_id: str, usage_metadata) -> None:
+        """Update the session's latest usage metadata."""
+        session = self._sessions.get(session_id)
+        if session:
+            session["usage_metadata"] = usage_metadata
+
+    def update_session_text(self, session_id: str, text_chunk: str) -> None:
+        """Accumulate output text for the session."""
+        session = self._sessions.get(session_id)
+        if session:
+            if "output_text" not in session:
+                session["output_text"] = ""
+            session["output_text"] += text_chunk
+
     def _cleanup_expired(self) -> None:
         """Remove all expired sessions."""
         now = time.time()

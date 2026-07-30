@@ -44,6 +44,118 @@ def _build_live_config(resume_text: str) -> types.LiveConnectConfig:
     )
 
 
+def calculate_session_cost(usage_metadata, elapsed_seconds: int, output_text: str = "") -> dict:
+    """
+    Calculate the estimated cost of a Gemini session in USD and Rupees.
+    Uses exact token counts from UsageMetadata if available, otherwise falls back to duration estimation.
+    """
+    input_text_tokens = 0
+    input_audio_tokens = 0
+    output_text_tokens = 0
+    output_audio_tokens = 0
+
+    if usage_metadata:
+        # Prompt tokens (input)
+        input_text_tokens = usage_metadata.prompt_token_count or 0
+        prompt_details = getattr(usage_metadata, "prompt_tokens_details", None) or []
+        for detail in prompt_details:
+            modality = str(getattr(detail, "modality", "")).upper()
+            if "AUDIO" in modality:
+                input_audio_tokens = detail.token_count or 0
+                # Subtract audio tokens from total prompt to get clean text token count
+                input_text_tokens = max(0, input_text_tokens - input_audio_tokens)
+
+        # Response tokens (output)
+        output_text_tokens = usage_metadata.response_token_count or 0
+        response_details = getattr(usage_metadata, "response_tokens_details", None) or []
+        for detail in response_details:
+            modality = str(getattr(detail, "modality", "")).upper()
+            if "AUDIO" in modality:
+                output_audio_tokens = detail.token_count or 0
+                # Subtract audio tokens from total response to get clean text token count
+                output_text_tokens = max(0, output_text_tokens - output_audio_tokens)
+
+    # If output_text_tokens is 0 but we have generated transcript text, estimate text tokens
+    if output_text_tokens == 0 and output_text:
+        word_count = len(output_text.split())
+        output_text_tokens = int(word_count * 1.33)
+
+    # Pricing per 1M tokens (USD)
+    input_text_rate = 0.75 / 1_000_000
+    input_audio_rate = 3.00 / 1_000_000
+    output_text_rate = 4.50 / 1_000_000
+    output_audio_rate = 12.00 / 1_000_000
+
+    # Calculate token costs
+    cost_input_text = input_text_tokens * input_text_rate
+    cost_input_audio = input_audio_tokens * input_audio_rate
+    cost_output_text = output_text_tokens * output_text_rate
+    cost_output_audio = output_audio_tokens * output_audio_rate
+
+    total_usd = cost_input_text + cost_input_audio + cost_output_text + cost_output_audio
+
+    # If no tokens were recorded (e.g. WebSocket disconnected quickly before usage_metadata arrived),
+    # fallback to duration-based estimates
+    if total_usd == 0 and elapsed_seconds > 0:
+        # Input Audio: $0.005 / min
+        # Output Audio: $0.018 / min
+        # Assume 80% of elapsed time was active mic input, 30% was AI speaking output
+        est_input_sec = elapsed_seconds * 0.8
+        est_output_sec = elapsed_seconds * 0.3
+        
+        cost_input_audio = est_input_sec * (0.005 / 60)
+        cost_output_audio = est_output_sec * (0.018 / 60)
+        total_usd = cost_input_audio + cost_output_audio
+
+    total_rupees = total_usd * 96.0
+
+    return {
+        "input_text_tokens": input_text_tokens,
+        "input_audio_tokens": input_audio_tokens,
+        "output_text_tokens": output_text_tokens,
+        "output_audio_tokens": output_audio_tokens,
+        
+        "cost_input_text_usd": f"${cost_input_text:.6f}",
+        "cost_input_audio_usd": f"${cost_input_audio:.6f}",
+        "cost_output_text_usd": f"${cost_output_text:.6f}",
+        "cost_output_audio_usd": f"${cost_output_audio:.6f}",
+        
+        "total_usd": f"{total_usd:.6f}",
+        "total_rupees": f"{total_rupees:.4f}"
+    }
+
+
+@router.get("/interview/summary/{session_id}")
+async def get_session_summary(session_id: str, duration_seconds: int = 0):
+    """
+    Get the billing summary for a finished interview session and release its memory.
+    """
+    session = session_store.get_session(session_id)
+    if session is None:
+        return {
+            "input_text_tokens": 0,
+            "input_audio_tokens": 0,
+            "output_text_tokens": 0,
+            "output_audio_tokens": 0,
+            "cost_input_text_usd": "$0.000000",
+            "cost_input_audio_usd": "$0.000000",
+            "cost_output_text_usd": "$0.000000",
+            "cost_output_audio_usd": "$0.000000",
+            "total_usd": "0.000000",
+            "total_rupees": "0.0000"
+        }
+
+    usage_metadata = session.get("usage_metadata")
+    output_text = session.get("output_text", "")
+    summary = calculate_session_cost(usage_metadata, duration_seconds, output_text)
+
+    # Clean up the session data
+    session_store.delete_session(session_id)
+    print(f"[Interview] Summary calculated and session {session_id} deleted")
+
+    return summary
+
+
 @router.websocket("/interview/{session_id}")
 async def interview_websocket(websocket: WebSocket, session_id: str):
     """
@@ -148,6 +260,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                             # Check for model text/transcript
                             if text := response.text:
                                 print(f"[Interview] Model text: {text[:80]}...")
+                                session_store.update_session_text(session_id, text)
                                 await websocket.send_text(json.dumps({
                                     "type": "transcript",
                                     "role": "model",
@@ -175,11 +288,17 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                                     tx_text = getattr(output_tx, "text", None)
                                     if tx_text:
                                         print(f"[Interview] Model said (transcribed): {tx_text[:80]}...")
+                                        session_store.update_session_text(session_id, tx_text)
                                         await websocket.send_text(json.dumps({
                                             "type": "transcript",
                                             "role": "model",
                                             "content": tx_text,
                                         }))
+
+                            # Capture and update latest usage metadata
+                            usage = getattr(response, "usage_metadata", None)
+                            if usage:
+                                session_store.update_session_usage(session_id, usage)
 
                         # Turn complete — signal the frontend
                         print("[Interview] Turn complete")
