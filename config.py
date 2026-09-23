@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "models/gemini-3.1-flash-live-preview"
+GEMINI_MODEL = "models/gemini-3.8-live-extended-thinking"
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 MAX_FILE_SIZE_MB = 10
 
