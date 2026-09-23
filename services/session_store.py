@@ -13,12 +13,13 @@ class SessionStore:
     def __init__(self):
         self._sessions: dict[str, dict] = {}
 
-    def create_session(self, resume_text: str, filename: str) -> str:
+    def create_session(self, resume_text: str, filename: str, is_copilot: bool = True) -> str:
         """Create a new session with parsed resume text. Returns session_id."""
         session_id = str(uuid.uuid4())
         self._sessions[session_id] = {
             "resume_text": resume_text,
             "filename": filename,
+            "is_copilot": is_copilot,
             "created_at": time.time(),
         }
         self._cleanup_expired()

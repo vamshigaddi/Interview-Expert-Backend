@@ -1,3 +1,5 @@
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from services.resume_parser import parse_resume
 from services.session_store import session_store
@@ -54,3 +56,25 @@ async def upload_resume(file: UploadFile = File(...)):
         "preview": preview,
         "text_length": len(resume_text),
     }
+
+
+class DirectSessionRequest(BaseModel):
+    resume_text: Optional[str] = ""
+    role: Optional[str] = "Software Engineer"
+    mode: Optional[str] = "coding"
+
+
+@router.post("/session/direct")
+async def create_direct_session(body: DirectSessionRequest = DirectSessionRequest()):
+    """
+    Create a session directly for desktop copilot without file upload.
+    """
+    resume_text = body.resume_text.strip() if body.resume_text else f"Target Role: {body.role}. Focus mode: {body.mode}."
+    session_id = session_store.create_session(resume_text, "desktop_direct_session", is_copilot=True)
+    return {
+        "session_id": session_id,
+        "filename": "desktop_direct_session",
+        "preview": resume_text[:200],
+    }
+
+

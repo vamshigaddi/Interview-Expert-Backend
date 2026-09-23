@@ -9,7 +9,7 @@ from google.genai import types
 from dotenv import load_dotenv
 
 from services.session_store import session_store
-from config import GEMINI_MODEL, SYSTEM_INSTRUCTION
+from config import GEMINI_MODEL, SYSTEM_INSTRUCTION, COPILOT_SYSTEM_INSTRUCTION
 
 load_dotenv()
 
@@ -25,9 +25,13 @@ client = genai.Client(
 )
 
 
-def _build_live_config(resume_text: str) -> types.LiveConnectConfig:
-    """Build Gemini Live API config with resume context as system instruction."""
-    system_prompt = SYSTEM_INSTRUCTION.format(resume_text=resume_text)
+def _build_live_config(resume_text: str, is_copilot: bool = True) -> types.LiveConnectConfig:
+    """
+    Build Gemini Live API config.
+    Gemini Live requires response_modalities=["AUDIO"].
+    For silent copilot mode, we use COPILOT_SYSTEM_INSTRUCTION and only stream the text transcripts to the HUD.
+    """
+    system_prompt = COPILOT_SYSTEM_INSTRUCTION.format(resume_text=resume_text) if is_copilot else SYSTEM_INSTRUCTION.format(resume_text=resume_text)
 
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
@@ -42,6 +46,8 @@ def _build_live_config(resume_text: str) -> types.LiveConnectConfig:
         input_audio_transcription=types.AudioTranscriptionConfig(),
         output_audio_transcription=types.AudioTranscriptionConfig(),
     )
+
+
 
 
 def calculate_session_cost(usage_metadata, elapsed_seconds: int, output_text: str = "") -> dict:
@@ -172,7 +178,8 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
     print(f"[Interview] WebSocket accepted for session {session_id}")
 
     resume_text = session["resume_text"]
-    config = _build_live_config(resume_text)
+    is_copilot = session.get("is_copilot", True)
+    config = _build_live_config(resume_text, is_copilot=is_copilot)
 
     # Flag to coordinate shutdown
     shutdown_event = asyncio.Event()
@@ -253,9 +260,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                             if shutdown_event.is_set():
                                 return
 
-                            # Check for audio data
-                            if data := response.data:
-                                audio_out_queue.put_nowait(data)
+                            # Check for audio data (only forward to browser in mock interview mode, silent for copilot)
+                            if not is_copilot and response.data:
+                                audio_out_queue.put_nowait(response.data)
 
                             # Check for model text/transcript
                             if text := response.text:
