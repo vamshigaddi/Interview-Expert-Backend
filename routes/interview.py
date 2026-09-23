@@ -36,7 +36,7 @@ def _build_live_config(resume_text: str, is_copilot: bool = True) -> types.LiveC
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=types.Content(
-            parts=[types.Part(text=system_prompt)]
+            parts=[types.Part.from_text(text=system_prompt)]
         ),
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
@@ -185,7 +185,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
     shutdown_event = asyncio.Event()
 
     try:
-        # Try connecting to Gemini — this is where most failures happen
+        # Try connecting to Gemini Live
         print(f"[Interview] Connecting to Gemini Live API ({GEMINI_MODEL})...")
         async with client.aio.live.connect(model=GEMINI_MODEL, config=config) as gemini_session:
             print(f"[Interview] ✅ Gemini session connected!")
@@ -218,10 +218,10 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                             return
 
                         if "bytes" in message and message["bytes"]:
-                            # Binary frame = raw PCM audio from microphone
+                            # Binary frame = raw PCM audio from microphone (16kHz 16-bit mono)
                             audio_data = message["bytes"]
                             await gemini_session.send_realtime_input(
-                                audio={"data": audio_data, "mime_type": "audio/pcm"},
+                                audio={"data": audio_data, "mime_type": "audio/pcm;rate=16000"},
                             )
 
                         elif "text" in message and message["text"]:
@@ -233,9 +233,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
 
                             if msg.get("type") == "text" and msg.get("content"):
                                 print(f"[Interview] Text chat from user: {msg['content'][:80]}...")
-                                await gemini_session.send(
-                                    input=msg["content"],
-                                    end_of_turn=True,
+                                await gemini_session.send_client_content(
+                                    turns=[types.Content(role="user", parts=[types.Part.from_text(text=msg["content"])])],
+                                    turn_complete=True
                                 )
                                 # Echo user's text message back as transcript
                                 await websocket.send_text(json.dumps({
@@ -252,69 +252,77 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                     shutdown_event.set()
 
             async def gemini_to_browser():
-                """Receive responses from Gemini and forward audio/text to browser."""
+                """Receive responses continuously from Gemini and forward transcripts/audio to client."""
                 try:
-                    while not shutdown_event.is_set():
-                        turn = gemini_session.receive()
-                        async for response in turn:
-                            if shutdown_event.is_set():
-                                return
+                    async for response in gemini_session.receive():
+                        if shutdown_event.is_set():
+                            break
 
-                            # Check for audio data (only forward to browser in mock interview mode, silent for copilot)
-                            if not is_copilot and response.data:
-                                audio_out_queue.put_nowait(response.data)
+                        server_content = getattr(response, "server_content", None)
+                        if server_content:
+                            # 1. User spoken audio transcription (what interviewer / user said)
+                            input_tx = getattr(server_content, "input_transcription", None)
+                            if input_tx:
+                                tx_text = getattr(input_tx, "text", None)
+                                if tx_text:
+                                    print(f"[Interview] User said (transcribed): {tx_text[:80]}...")
+                                    await websocket.send_text(json.dumps({
+                                        "type": "transcript",
+                                        "role": "user",
+                                        "content": tx_text,
+                                    }))
 
-                            # Check for model text/transcript
-                            if text := response.text:
-                                print(f"[Interview] Model text: {text[:80]}...")
-                                session_store.update_session_text(session_id, text)
-                                await websocket.send_text(json.dumps({
-                                    "type": "transcript",
-                                    "role": "model",
-                                    "content": text,
-                                }))
+                            # 2. Model spoken audio transcription (what model responded)
+                            output_tx = getattr(server_content, "output_transcription", None)
+                            if output_tx:
+                                tx_text = getattr(output_tx, "text", None)
+                                if tx_text:
+                                    print(f"[Interview] Model said (transcribed): {tx_text[:80]}...")
+                                    session_store.update_session_text(session_id, tx_text)
+                                    await websocket.send_text(json.dumps({
+                                        "type": "transcript",
+                                        "role": "model",
+                                        "content": tx_text,
+                                    }))
 
-                            # Check for transcriptions from server_content
-                            server_content = getattr(response, "server_content", None)
-                            if server_content:
-                                # Input transcription (what user said via audio)
-                                input_tx = getattr(server_content, "input_transcription", None)
-                                if input_tx:
-                                    tx_text = getattr(input_tx, "text", None)
-                                    if tx_text:
-                                        print(f"[Interview] User said (transcribed): {tx_text[:80]}...")
-                                        await websocket.send_text(json.dumps({
-                                            "type": "transcript",
-                                            "role": "user",
-                                            "content": tx_text,
-                                        }))
-
-                                # Output transcription (what model said)
-                                output_tx = getattr(server_content, "output_transcription", None)
-                                if output_tx:
-                                    tx_text = getattr(output_tx, "text", None)
-                                    if tx_text:
-                                        print(f"[Interview] Model said (transcribed): {tx_text[:80]}...")
-                                        session_store.update_session_text(session_id, tx_text)
+                            # 3. Model turn parts (text tokens and audio data)
+                            model_turn = getattr(server_content, "model_turn", None)
+                            if model_turn and model_turn.parts:
+                                for part in model_turn.parts:
+                                    if part.text:
+                                        print(f"[Interview] Model text part: {part.text[:80]}...")
+                                        session_store.update_session_text(session_id, part.text)
                                         await websocket.send_text(json.dumps({
                                             "type": "transcript",
                                             "role": "model",
-                                            "content": tx_text,
+                                            "content": part.text,
                                         }))
+                                    if not is_copilot and part.inline_data and part.inline_data.data:
+                                        audio_out_queue.put_nowait(part.inline_data.data)
 
-                            # Capture and update latest usage metadata
-                            usage = getattr(response, "usage_metadata", None)
-                            if usage:
-                                session_store.update_session_usage(session_id, usage)
+                            # 4. Turn complete signal
+                            if getattr(server_content, "turn_complete", None):
+                                print("[Interview] Turn complete")
+                                await websocket.send_text(json.dumps({"type": "audio_end"}))
 
-                        # Turn complete — signal the frontend
-                        print("[Interview] Turn complete")
-                        try:
+                        # Direct response.data check (if audio is top-level in mock interview mode)
+                        if not is_copilot and getattr(response, "data", None):
+                            audio_out_queue.put_nowait(response.data)
+
+                        # Direct response.text check
+                        if getattr(response, "text", None):
+                            text = response.text
+                            session_store.update_session_text(session_id, text)
                             await websocket.send_text(json.dumps({
-                                "type": "audio_end"
+                                "type": "transcript",
+                                "role": "model",
+                                "content": text,
                             }))
-                        except Exception:
-                            pass
+
+                        # Capture and update latest usage metadata
+                        usage = getattr(response, "usage_metadata", None)
+                        if usage:
+                            session_store.update_session_usage(session_id, usage)
 
                 except asyncio.CancelledError:
                     pass
@@ -348,8 +356,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                     traceback.print_exc()
                     shutdown_event.set()
 
-            # Run all three tasks concurrently using gather instead of TaskGroup
-            # (TaskGroup raises ExceptionGroup which is harder to handle)
+            # Run all three tasks concurrently
             tasks = [
                 asyncio.create_task(browser_to_gemini()),
                 asyncio.create_task(gemini_to_browser()),
@@ -367,7 +374,6 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 for task in tasks:
                     if not task.done():
                         task.cancel()
-                # Wait for cancellations to complete
                 await asyncio.gather(*tasks, return_exceptions=True)
 
     except WebSocketDisconnect:
@@ -385,3 +391,4 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
             pass
     finally:
         print(f"[Interview] Session {session_id} ended")
+
