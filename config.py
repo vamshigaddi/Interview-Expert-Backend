@@ -4,9 +4,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "models/gemini-3.8-live-extended-thinking"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "models/gemini-3.8-live-extended-thinking")
+THINKING_LEVEL = os.environ.get("THINKING_LEVEL", "LOW")  # Options: "LOW", "HIGH"
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 MAX_FILE_SIZE_MB = 10
+
 
 # Audio settings (matching Gemini Live API requirements)
 SEND_SAMPLE_RATE = 16000

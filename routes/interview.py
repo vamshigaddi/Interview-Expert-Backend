@@ -9,7 +9,7 @@ from google.genai import types
 from dotenv import load_dotenv
 
 from services.session_store import session_store
-from config import GEMINI_MODEL, SYSTEM_INSTRUCTION, COPILOT_SYSTEM_INSTRUCTION
+from config import GEMINI_MODEL, THINKING_LEVEL, SYSTEM_INSTRUCTION, COPILOT_SYSTEM_INSTRUCTION
 
 load_dotenv()
 
@@ -17,6 +17,7 @@ router = APIRouter()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 print(f"[Interview] API key loaded: {'YES (' + GEMINI_API_KEY[:8] + '...)' if GEMINI_API_KEY else 'NO — check your .env file!'}")
+print(f"[Interview] Model: {GEMINI_MODEL} (Thinking Level: {THINKING_LEVEL if 'thinking' in GEMINI_MODEL.lower() else 'N/A'})")
 
 # Initialize the Gemini client
 client = genai.Client(
@@ -33,11 +34,23 @@ def _build_live_config(resume_text: str, is_copilot: bool = True) -> types.LiveC
     """
     system_prompt = COPILOT_SYSTEM_INSTRUCTION.format(resume_text=resume_text) if is_copilot else SYSTEM_INSTRUCTION.format(resume_text=resume_text)
 
+    # Thinking configuration: required for thinking models like gemini-3.8-live-extended-thinking
+    thinking_config = None
+    context_window_compression = None
+    if "thinking" in GEMINI_MODEL.lower():
+        thinking_config = types.ThinkingConfig(thinking_level=THINKING_LEVEL)
+        context_window_compression = types.ContextWindowCompressionConfig(
+            trigger_tokens=104857,
+            sliding_window=types.SlidingWindow(target_tokens=52428),
+        )
+
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=types.Content(
             parts=[types.Part.from_text(text=system_prompt)]
         ),
+        thinking_config=thinking_config,
+        context_window_compression=context_window_compression,
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Zephyr")
@@ -291,6 +304,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                                     model_turn = getattr(server_content, "model_turn", None)
                                     if model_turn and model_turn.parts:
                                         for part in model_turn.parts:
+                                            # Skip internal thinking thoughts for extended thinking models
+                                            if getattr(part, "thought", False):
+                                                continue
                                             if part.text:
                                                 print(f"[Interview] Model text part: {part.text[:80]}...")
                                                 session_store.update_session_text(session_id, part.text)
