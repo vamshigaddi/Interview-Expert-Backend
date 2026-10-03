@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.upload import router as upload_router
 from routes.interview import router as interview_router
+from routes.screen import router as screen_router
 
 app = FastAPI(
     title="Interview Expert API",
@@ -21,6 +22,7 @@ app.add_middleware(
 # Register routers
 app.include_router(upload_router, prefix="/api")
 app.include_router(interview_router, prefix="/api")
+app.include_router(screen_router, prefix="/api")
 
 
 @app.get("/api/health")
