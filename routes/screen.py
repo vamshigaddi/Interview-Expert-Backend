@@ -16,7 +16,7 @@ router = APIRouter()
 
 # Live models (e.g. gemini-3.8-live) only work over the bidirectional Live API,
 # so screen analysis uses a standard multimodal model with the SAME API key.
-SCREEN_MODEL = os.environ.get("SCREEN_MODEL", "gemini-2.5-flash")
+SCREEN_MODEL = os.environ.get("SCREEN_MODEL", "gemini-3.8-flash")
 print(f"[Screen] Vision model: {SCREEN_MODEL}")
 
 _client: Optional[genai.Client] = None
