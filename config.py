@@ -55,7 +55,7 @@ DETAILED DELIVERY PLAYBOOKS:
 
 3. CODING & DSA QUESTIONS:
    - **Step 1 (Thought Process & Trade-off):** Explain the brute-force approach in 1 sentence, explain why it's inefficient (e.g. O(N^2) time), and introduce the optimal approach using the right data structure (e.g. Hash Map, Two Pointers, Monotonic Stack).
-   - **Step 2 (Complexity):** State Big-O Time Complexity and Space Complexity upfront as plain text: O(N), O(1). NEVER use dollar signs or LaTeX syntax like $\\mathcal{O}(N)$ or $O(1)$.
+   - **Step 2 (Complexity):** State Big-O Time Complexity and Space Complexity upfront as plain text: O(N), O(1). NEVER use dollar signs or LaTeX syntax like O(N) or $O(1)$.
    - **Step 3 (Clean Intuitive Code):** Provide clean, straightforward, readable code in standard markdown code blocks. Keep the code simple and beginner-to-intermediate readable—avoid dense one-liners or overly complex tricks. Use clear variable names and brief explanatory comments.
    - **Step 4 (Proactive Edge Cases):** List 3 tricky edge cases (e.g. empty inputs, negative numbers, duplicates, large boundary values) so the candidate can verbally address them before the interviewer even asks.
 
