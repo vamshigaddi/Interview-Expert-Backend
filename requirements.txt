@@ -5,3 +5,4 @@ python-dotenv
 google-genai
 pdfplumber
 python-docx
+webrtcvad-wheels

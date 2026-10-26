@@ -1,0 +1,72 @@
+GADDI PRAVEEN KUMAR
+Hyderabad, India
+📧 pravngddi@gmail.com | 📞 9618258365
+🔗 LinkedIn: linkedin.com/in/praveen-gaddi
+🔗 GitHub: (Add your GitHub link)
+PROFESSIONAL SUMMARY
+Computer Science Engineering student specializing in Artificial Intelligence and Machine Learning.
+Skilled in building predictive models, developing REST APIs, and working with Generative AI
+technologies such as Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG).
+Strong problem-solving mindset with the ability to develop scalable and real-world applications.
+TECHNICAL SKILLS
+Programming Languages
+Python, Java, JavaScript, HTML, CSS
+Frameworks & Technologies
+FastAPI, Flask, REST API Development, React.js (Basics)
+Machine Learning & AI
+Supervised & Unsupervised Learning, Model Training & Evaluation, Feature Engineering, Natural
+Language Processing (NLP)
+Generative AI & LLMs
+Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), Prompt Engineering, Chatbot
+Development, Text Embeddings, Semantic Search, Vector Databases (FAISS - Basics), LangChain (Basics)
+Libraries & Tools
+Pandas, NumPy, Matplotlib, Scikit-learn, NLTK, Hugging Face Transformers (Basics), OpenAI API (Basics)
+Databases
+MySQL, PostgreSQL
+Tools & Platforms
+Git, GitHub, Jupyter Notebook, VS Code, Postman
+1
+Core Concepts
+Data Structures & Algorithms (Basics), Object-Oriented Programming (OOP), DBMS, Operating Systems
+PROJECTS
+Road Accident Prediction Using Machine Learning
+• Developed a machine learning model to analyze road accident patterns across India
+• Collected data from traffic cameras, police reports, and hospital records
+• Integrated IoT hardware such as speed and alcohol sensors for real-time alerts
+• Designed an SMS alert system to notify users about risk situations
+Vehicle Diagnostic Chatbot
+• Developed an AI-based chatbot to assist users in identifying vehicle issues
+• Built frontend using React.js for smooth user interaction
+• Provided diagnostic suggestions using machine learning logic
+• Improved user experience with simple and intuitive design
+AI Knowledge Chatbot using RAG
+• Built an AI chatbot using Retrieval-Augmented Generation (RAG)
+• Integrated Large Language Models (LLMs) to answer user queries based on custom data
+• Used embeddings and vector search for semantic information retrieval
+• Developed backend APIs using FastAPI
+• Improved accuracy using context-aware responses
+EDUCATION
+Bachelor of Technology (B.Tech) in Computer Science Engineering (AI & ML)
+Malla Reddy Engineering College | 2022 – Present
+CGPA: 8.4/10
+Intermediate (MPC)
+SR Junior College | 2020 – 2022
+Score: 982/1000
+Secondary School (SSC)
+TS Model School | 2019 – 2020
+GPA: 10/10
+CERTIFICATIONS
+• Azure AI Fundamentals – Microsoft
+• Advanced AI and Deep Learning – Skilltimate Technologies
+• AI-ML Engineer Foundation Course – Reliance Foundation
+2
+• Python Programming – Skilltimate Technologies
+SOFT SKILLS
+Leadership, Communication, Adaptability, Problem-Solving
+LANGUAGES
+Telugu, English, Hindi
+ADDITIONAL INFORMATION
+• Available for internships and entry-level roles in AI/ML, Backend Development, and Software
+Engineering
+• Strong interest in building AI-powered real-world applications
+3

@@ -16,7 +16,7 @@ load_dotenv()
 router = APIRouter()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-print(f"[Interview] API key loaded: {'YES (' + GEMINI_API_KEY[:8] + '...)' if GEMINI_API_KEY else 'NO — check your .env file!'}")
+print(f"[Interview] API key loaded: {'YES (' + GEMINI_API_KEY[:8] + '...)' if GEMINI_API_KEY else 'NO - check your .env file!'}")
 print(f"[Interview] Model: {GEMINI_MODEL} (Thinking Level: {THINKING_LEVEL if 'thinking' in GEMINI_MODEL.lower() else 'N/A'})")
 
 # Initialize the Gemini client
@@ -201,7 +201,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
         # Try connecting to Gemini Live
         print(f"[Interview] Connecting to Gemini Live API ({GEMINI_MODEL})...")
         async with client.aio.live.connect(model=GEMINI_MODEL, config=config) as gemini_session:
-            print(f"[Interview] ✅ Gemini session connected!")
+            print(f"[Interview] OK Gemini session connected!")
 
             # Notify frontend that the session is ready
             await websocket.send_text(json.dumps({
@@ -260,7 +260,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
-                    print(f"[Interview] ❌ browser_to_gemini error: {e}")
+                    print(f"[Interview] ERROR browser_to_gemini error: {e}")
                     traceback.print_exc()
                     shutdown_event.set()
 
@@ -350,7 +350,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                         except Exception as turn_err:
                             if shutdown_event.is_set():
                                 return
-                            print(f"[Interview] ⚠️ Turn receiver notice: {turn_err}")
+                            print(f"[Interview] WARN Turn receiver notice: {turn_err}")
                             await asyncio.sleep(0.1)
 
                 except asyncio.CancelledError:
@@ -359,7 +359,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                     print("[Interview] Browser disconnected (gemini_to_browser)")
                     shutdown_event.set()
                 except Exception as e:
-                    print(f"[Interview] ❌ gemini_to_browser error: {e}")
+                    print(f"[Interview] ERROR gemini_to_browser error: {e}")
                     traceback.print_exc()
                     shutdown_event.set()
 
@@ -381,7 +381,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                     print("[Interview] Browser disconnected (send_audio)")
                     shutdown_event.set()
                 except Exception as e:
-                    print(f"[Interview] ❌ send_audio_to_browser error: {e}")
+                    print(f"[Interview] ERROR send_audio_to_browser error: {e}")
                     traceback.print_exc()
                     shutdown_event.set()
 
@@ -408,7 +408,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         print(f"[Interview] Client disconnected from session {session_id}")
     except Exception as e:
-        print(f"[Interview] ❌ SESSION ERROR: {e}")
+        print(f"[Interview] SESSION ERROR: {e}")
         traceback.print_exc()
         try:
             await websocket.send_text(json.dumps({

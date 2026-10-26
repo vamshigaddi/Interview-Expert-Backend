@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -54,6 +55,7 @@ async def upload_resume(file: UploadFile = File(...)):
         "session_id": session_id,
         "filename": filename,
         "preview": preview,
+        "full_text": resume_text,
         "text_length": len(resume_text),
     }
 
@@ -68,8 +70,26 @@ class DirectSessionRequest(BaseModel):
 async def create_direct_session(body: DirectSessionRequest = DirectSessionRequest()):
     """
     Create a session directly for desktop copilot without file upload.
+    If no resume is provided, automatically loads the default candidate resume.
     """
-    resume_text = body.resume_text.strip() if body.resume_text else f"Target Role: {body.role}. Focus mode: {body.mode}."
+    resume_text = body.resume_text.strip() if body.resume_text else ""
+
+    # If no custom resume provided or just a short fallback string, load default resume if available
+    if len(resume_text) < 150:
+        default_resume_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "default_resume.txt")
+        if os.path.exists(default_resume_path):
+            try:
+                with open(default_resume_path, "r", encoding="utf-8") as f:
+                    loaded = f.read().strip()
+                    if loaded:
+                        resume_text = loaded
+                        print(f"[Upload] Loaded default candidate resume ({len(resume_text)} chars)")
+            except Exception as e:
+                print(f"[Upload] Error loading default resume: {e}")
+
+    if not resume_text:
+        resume_text = f"Target Role: {body.role}. Focus mode: {body.mode}."
+
     session_id = session_store.create_session(resume_text, "desktop_direct_session", is_copilot=True)
     return {
         "session_id": session_id,
