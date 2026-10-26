@@ -31,10 +31,9 @@ router = APIRouter()
 
 STT_MODEL = os.environ.get("STT_MODEL", "gemini-3.5-transcribe-live")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-3.6-flash")
-LLM_THINKING_BUDGET = int(os.environ.get("FLASH_THINKING_BUDGET", "0"))
 SILENCE_SECONDS = float(os.environ.get("SILENCE_SECONDS", "0.6"))
 
-print(f"[InterviewV2] STT={STT_MODEL} | LLM={LLM_MODEL} | silence={SILENCE_SECONDS}s ({int(SILENCE_SECONDS*1000)}ms) | thinking_budget={LLM_THINKING_BUDGET}")
+print(f"[InterviewV2] STT={STT_MODEL} | LLM={LLM_MODEL} | silence={SILENCE_SECONDS}s ({int(SILENCE_SECONDS*1000)}ms)")
 
 client = genai.Client(
     http_options={"api_version": "v1beta"},
@@ -51,14 +50,10 @@ def _build_stt_config():
 
 async def _generate_answer(system_prompt: str, contents: list):
     """Stream answer chunks immediately as they are generated with multi-turn history."""
-    config_kwargs = {
-        "system_instruction": system_prompt,
-        "temperature": 0.7,
-    }
-    if LLM_THINKING_BUDGET > 0:
-        config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=LLM_THINKING_BUDGET)
-
-    gen_config = types.GenerateContentConfig(**config_kwargs)
+    gen_config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        temperature=0.7,
+    )
     response_stream = await client.aio.models.generate_content_stream(
         model=LLM_MODEL,
         contents=contents,
