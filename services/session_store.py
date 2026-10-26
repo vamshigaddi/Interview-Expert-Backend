@@ -7,7 +7,7 @@ from config import SESSION_TTL_SECONDS
 class SessionStore:
     """
     Simple in-memory session store for holding parsed resume text.
-    Sessions auto-expire after SESSION_TTL_SECONDS (default 1 hour).
+    Sessions auto-expire after SESSION_TTL_SECONDS (default 1 hour) of INACTIVITY.
     """
 
     def __init__(self):
@@ -21,6 +21,7 @@ class SessionStore:
             "filename": filename,
             "is_copilot": is_copilot,
             "created_at": time.time(),
+            "last_active": time.time(),
         }
         self._cleanup_expired()
         return session_id
@@ -31,9 +32,10 @@ class SessionStore:
         session = self._sessions.get(session_id)
         if session is None:
             return None
-        if time.time() - session["created_at"] > SESSION_TTL_SECONDS:
+        if time.time() - session.get("last_active", session["created_at"]) > SESSION_TTL_SECONDS:
             del self._sessions[session_id]
             return None
+        session["last_active"] = time.time()
         return session
 
     def delete_session(self, session_id: str) -> None:
@@ -50,6 +52,7 @@ class SessionStore:
         """Accumulate output text for the session."""
         session = self._sessions.get(session_id)
         if session:
+            session["last_active"] = time.time()
             if "output_text" not in session:
                 session["output_text"] = ""
             session["output_text"] += text_chunk
@@ -59,7 +62,7 @@ class SessionStore:
         now = time.time()
         expired = [
             sid for sid, data in self._sessions.items()
-            if now - data["created_at"] > SESSION_TTL_SECONDS
+            if now - data.get("last_active", data["created_at"]) > SESSION_TTL_SECONDS
         ]
         for sid in expired:
             del self._sessions[sid]
