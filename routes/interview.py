@@ -180,15 +180,28 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for real-time interview audio streaming.
     """
-    # Validate the session exists
-    session = session_store.get_session(session_id)
-    if session is None:
-        print(f"[Interview] Session {session_id} not found or expired")
-        await websocket.close(code=4004, reason="Session not found or expired")
-        return
-
     await websocket.accept()
     print(f"[Interview] WebSocket accepted for session {session_id}")
+
+    session = session_store.get_session(session_id)
+    if session is None:
+        print(f"[Interview] Session {session_id} not in memory (Cloud Run scale or cold start). Recovering with default resume...")
+        default_resume_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "default_resume.txt")
+        resume_text = ""
+        if os.path.exists(default_resume_path):
+            try:
+                with open(default_resume_path, "r", encoding="utf-8") as f:
+                    resume_text = f.read().strip()
+            except Exception as e:
+                print(f"[Interview] Error reading default resume: {e}")
+        if not resume_text:
+            resume_text = "Target Role: AI & ML / Software Engineer."
+        session_store.create_session(resume_text, "cloud_run_recovered_session", is_copilot=True)
+        session = session_store.get_session(session_id) or {
+            "resume_text": resume_text,
+            "filename": "cloud_run_recovered_session",
+            "is_copilot": True,
+        }
 
     resume_text = session["resume_text"]
     is_copilot = session.get("is_copilot", True)
